@@ -9,6 +9,23 @@
     # For building your agents and data processing pipelines
     pkgs.python3
     pkgs.python3Packages.pip
+    pkgs.jupyter
+
+    # Core data science and machine learning libraries
+    pkgs.python3Packages.numpy
+    pkgs.python3Packages.pandas
+    pkgs.python3Packages.scipy
+    pkgs.python3Packages.scikitlearn
+    pkgs.python3Packages.matplotlib
+
+    # Hugging Face ecosystem for state-of-the-art AI models
+    pkgs.python3Packages.transformers
+    pkgs.python3Packages.datasets
+    pkgs.python3Packages.accelerate
+    pkgs.python3Packages.diffusers
+
+    # For geospatial data analysis
+    pkgs.gdal
 
     # For creating web interfaces or APIs
     pkgs.nodejs_22
@@ -32,6 +49,9 @@
   # Sets environment variables in the workspace
   env = {
     DEEPSEEK_API_KEY = "your-secret-key";
+    # Add your Hugging Face token for private models and other features
+    # HUGGING_FACE_HUB_TOKEN = "your-hugging-face-token";
+    # GITHUB_TOKEN = "your-github-token";
   };
 
   idx = {
