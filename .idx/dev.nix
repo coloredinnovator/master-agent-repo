@@ -51,7 +51,7 @@
     DEEPSEEK_API_KEY = "your-secret-key";
     # Add your Hugging Face token for private models and other features
     # HUGGING_FACE_HUB_TOKEN = "your-hugging-face-token";
-    # GITHUB_TOKEN = "your-github-token";
+    GITHUB_TOKEN = "ghp_xOHYJQxejg72T2baAEBKynp5yvznlqz2vBnuMi";
   };
 
   idx = {
@@ -71,4 +71,13 @@
       };
     };
   };
+}
+{ pkgs, ... }: {
+  # ... other configurations
+  env = {
+    # ... other environment variables
+    HUGGING_FACE_HUB_TOKEN = "your-hugging-face-token";oauth_app_secret_pqLLkMnBtmTHMykGkbBrtHinTvZFEHLqfX
+    
+  };
+  # ... other configurations
 }
