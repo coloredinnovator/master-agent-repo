@@ -9,6 +9,20 @@
         "--only",
         "auth,firestore"
       ]
+    },
+    "terraform": {
+      "command": "terraform",
+      "args": [
+        "-version"
+      ]
+    },
+    "gcloud": {
+      "command": "gcloud",
+      "args": [
+        "beta",
+        "code",
+        "dev"
+      ]
     }
   }
 }
