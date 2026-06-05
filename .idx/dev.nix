@@ -1,6 +1,6 @@
 { pkgs, ... }: {
   channel = "stable-24.11";
-  packages = [ pkgs.terraform pkgs.google-cloud-sdk ];
+  packages = [ pkgs.terraform pkgs.google-cloud-sdk pkgs.git ];
   idx = {
     extensions = [
       "mhutchie.git-graph"

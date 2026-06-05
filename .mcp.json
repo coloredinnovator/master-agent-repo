@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "jetro": {
+      "type": "stdio",
+      "command": "/home/user/.jetro/runtime/node-linux-x64",
+      "args": [
+        "/home/user/.jetro/mcp-server/index.js"
+      ],
+      "env": {
+        "JET_WORKSPACE": "/home/user/maroon-codex",
+        "JET_API_URL": "https://api.jetro.ai",
+        "PATH": "/home/user/.jetro/runtime:/nix/store/19yf2calxksr5cschk8xs21q66kn4myl-code-oss/bin/remote-cli:/usr/bin:/usr/sbin:~/.global_modules/bin:/nix/store/lpdrfl6n16q5zdf8acp4bni7yczzcx3h-idx-builtins/bin:node_modules/.bin:/home/user/flutter/bin:/home/user/.pub-cache/bin:/opt/android/platform-tools"
+      }
+    }
+  }
+}
