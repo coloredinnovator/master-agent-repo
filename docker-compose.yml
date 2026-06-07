@@ -4,39 +4,35 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: hermes_postgres
-    environment:
-      POSTGRES_USER: hermes
-      POSTGRES_PASSWORD: hermes_password
-      POSTGRES_DB: hermes_db
+    env_file: .env
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hermes"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hermes}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v23.2.2
     container_name: hermes_kafka
     command:
-      - redpanda
-      - start
-      - --smp 1
-      - --memory 1G
-      - --reserve-memory 0M
-      - --overprovisioned
-      - --node-id 0
-      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
-      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - redpanda start
+        --smp 1
+        --memory 1G
+        --reserve-memory 0M
+        --overprovisioned
+        --node-id 0
+        --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+        --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
     ports:
       - "19092:19092"
     volumes:
       - redpanda_data:/var/lib/redpanda/data
-
-  # --- NEW 30-REPO INFRASTRUCTURE ---
+    restart: unless-stopped
 
   chromadb:
     image: chromadb/chroma:0.4.24
@@ -45,20 +41,23 @@ services:
       - "8000:8000"
     volumes:
       - chromadb_data:/chroma/chroma
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: hermes_redis
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
   searxng:
     image: searxng/searxng:latest
     container_name: hermes_searxng
     ports:
-      - "8080:8080"
+      - "8888:8080"
     volumes:
       - searxng_data:/etc/searxng
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:v2.50.1
@@ -67,6 +66,7 @@ services:
       - "9090:9090"
     volumes:
       - prometheus_data:/prometheus
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:10.4.0
@@ -75,29 +75,27 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-
-  # --- MASTER ORCHESTRATOR ---
+    restart: unless-stopped
 
   hermes:
     build: .
     container_name: hermes_agent
+    env_file: .env
     environment:
-      - PORT=8081 # Changed to 8081 to avoid conflict with SearxNG
       - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=hermes
-      - POSTGRES_PASSWORD=hermes_password
-      - POSTGRES_DB=hermes_db
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - CHROMADB_HOST=chromadb
       - REDIS_HOST=redis
     ports:
-      - "8081:8081"
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
       redpanda:
         condition: service_started
+      redis:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   postgres_data:

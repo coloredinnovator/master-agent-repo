@@ -1,0 +1,22 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.md
+*.txt
+!requirements.txt
+.env
+.env.example
+.gitignore
+.cursor
+.idx
+.jetro
+.agents
+k8s/
+terraform/
+data/
+maroon dump/
+wffoodgroup_drive/
+*.log
+*.zip

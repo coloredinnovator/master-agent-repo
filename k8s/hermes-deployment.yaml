@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hermes-agent
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -15,7 +16,6 @@ spec:
       containers:
       - name: hermes
         image: hermes-agent:latest
-        imagePullPolicy: Never # Adjust for cloud deployments
         ports:
         - containerPort: 8080
         env:
@@ -26,20 +26,51 @@ spec:
         - name: POSTGRES_PORT
           value: "5432"
         - name: POSTGRES_USER
-          value: "hermes"
+          valueFrom:
+            secretKeyRef:
+              name: hermes-secrets
+              key: POSTGRES_USER
         - name: POSTGRES_PASSWORD
-          value: "hermes_password"
+          valueFrom:
+            secretKeyRef:
+              name: hermes-secrets
+              key: POSTGRES_PASSWORD
         - name: POSTGRES_DB
-          value: "hermes_db"
+          valueFrom:
+            secretKeyRef:
+              name: hermes-secrets
+              key: POSTGRES_DB
         - name: KAFKA_BOOTSTRAP_SERVERS
           value: "redpanda:9092"
-        - name: NEO4J_URL
-          value: "neo4j://neo4j:7687"
+        - name: REDIS_HOST
+          value: "redis"
+        - name: CHROMADB_HOST
+          value: "chromadb"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: hermes-service
+  namespace: default
 spec:
   type: LoadBalancer
   selector:

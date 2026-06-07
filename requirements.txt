@@ -1,35 +1,42 @@
-fastapi==0.110.0
-uvicorn==0.27.1
-pydantic==2.6.3
-langchain-core==0.1.30
-langchain-openai==0.0.8
-langchain-ollama==0.0.1
-langchain-neo4j==0.0.1
-google-cloud-storage==2.15.0
-google-cloud-bigquery==3.18.0
-langgraph==0.0.26
-psycopg2-binary==2.9.9
-confluent-kafka==2.3.0
-crewai==0.22.5
-crewai[tools]==0.22.5
-huggingface-hub==0.21.4
-langchain-huggingface==0.0.2
-google-cloud-aiplatform==1.44.0
-google-cloud-logging==3.9.0
+# === Core Framework ===
+fastapi>=0.110.0
+uvicorn>=0.27.0
+pydantic>=2.6.0
 
-# --- 30-Repo Master Integrations ---
-llama-index==0.10.15
-metagpt==0.8.1
-pymemgpt==0.3.3
-chromadb==0.4.24
-qdrant-client==1.8.0
-faiss-cpu==1.8.0
-dspy-ai==2.4.0
-unstructured==0.12.5
-open-interpreter==0.2.0
-playwright==1.42.0
-pandasai==2.0.23
-openai-whisper==20231117
-litellm==1.31.14
-mlflow==2.11.1
-redis==5.0.3
+# === LangChain / LangGraph ===
+langchain-core>=0.1.30
+langchain-openai>=0.0.8
+langchain-ollama>=0.0.1
+langchain-neo4j>=0.0.1
+langchain-huggingface>=0.0.2
+langgraph>=0.0.26
+
+# === Google Cloud ===
+google-cloud-storage>=2.15.0
+google-cloud-bigquery>=3.18.0
+google-cloud-logging>=3.9.0
+google-cloud-aiplatform>=1.44.0
+
+# === Databases ===
+psycopg2-binary>=2.9.9
+redis>=5.0.0
+
+# === Streaming ===
+confluent-kafka>=2.3.0
+
+# === Multi-Agent ===
+crewai>=0.22.5
+
+# === AI / ML ===
+huggingface-hub>=0.21.0
+litellm>=1.31.0
+chromadb>=0.4.24
+
+# === Data Processing ===
+llama-index>=0.10.15
+dspy-ai>=2.4.0
+unstructured>=0.12.0
+pandasai>=2.0.0
+
+# === Observability ===
+mlflow>=2.11.0

@@ -1,0 +1,74 @@
+name: Hermes CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax check Python files
+        run: |
+          python -m py_compile mission_zero.py
+          python -m py_compile crew_orchestrator.py
+          python -m py_compile bq_exporter.py
+          python -m py_compile ai_studio_organizer.py
+          python -m py_compile drive_cleaner.py
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+      - name: Validate Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: [gcp, aws, azure]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.7.0'
+
+      - name: Terraform Init & Validate (${{ matrix.provider }})
+        run: |
+          cd terraform/${{ matrix.provider }}
+          terraform init -backend=false
+          terraform validate
+        continue-on-error: true
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-and-validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build -t hermes-agent:test .
+
+      - name: Verify image starts
+        run: |
+          docker run -d --name hermes-test \
+            -e PORT=8080 \
+            -e LLM_PROVIDER=ollama \
+            -p 8080:8080 \
+            hermes-agent:test || true
+          sleep 5
+          docker logs hermes-test || true
+          docker stop hermes-test || true

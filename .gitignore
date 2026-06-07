@@ -1,0 +1,46 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# ===== Environment & Secrets =====
+.env
+*.pem
+*.key
+google_token.json
+service-account*.json
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+.idx/
+.jetro/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Terraform =====
+terraform/.terraform/
+terraform/**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# ===== Docker =====
+*.log
+
+# ===== Data =====
+maroon dump/
+wffoodgroup_drive/
