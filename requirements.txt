@@ -8,3 +8,5 @@ langchain-neo4j==0.0.1
 google-cloud-storage==2.15.0
 google-cloud-bigquery==3.18.0
 langgraph==0.0.26
+psycopg2-binary==2.9.9
+confluent-kafka==2.3.0

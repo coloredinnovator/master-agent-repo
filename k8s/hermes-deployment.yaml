@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hermes-agent
+  template:
+    metadata:
+      labels:
+        app: hermes-agent
+    spec:
+      containers:
+      - name: hermes
+        image: hermes-agent:latest
+        imagePullPolicy: Never # Adjust for cloud deployments
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: POSTGRES_HOST
+          value: "postgres"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_USER
+          value: "hermes"
+        - name: POSTGRES_PASSWORD
+          value: "hermes_password"
+        - name: POSTGRES_DB
+          value: "hermes_db"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "redpanda:9092"
+        - name: NEO4J_URL
+          value: "neo4j://neo4j:7687"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: hermes-agent
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

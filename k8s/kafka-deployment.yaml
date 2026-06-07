@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+spec:
+  serviceName: "redpanda"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redpanda
+  template:
+    metadata:
+      labels:
+        app: redpanda
+    spec:
+      containers:
+      - name: redpanda
+        image: docker.redpanda.com/redpandadata/redpanda:v23.2.2
+        args:
+        - start
+        - --smp 1
+        - --memory 1G
+        - --reserve-memory 0M
+        - --overprovisioned
+        - --node-id 0
+        - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+        - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+        ports:
+        - containerPort: 9092
+          name: internal
+        - containerPort: 19092
+          name: external
+        volumeMounts:
+        - name: redpanda-data
+          mountPath: /var/lib/redpanda/data
+  volumeClaimTemplates:
+  - metadata:
+      name: redpanda-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+spec:
+  selector:
+    app: redpanda
+  ports:
+    - name: internal
+      protocol: TCP
+      port: 9092
+      targetPort: 9092
+    - name: external
+      protocol: TCP
+      port: 19092
+      targetPort: 19092

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: hermes_postgres
+    environment:
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: hermes_password
+      POSTGRES_DB: hermes_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redpanda:
+    # Redpanda is a Kafka-compatible streaming platform that is much lighter and easier to run
+    image: docker.redpanda.com/redpandadata/redpanda:v23.2.2
+    container_name: hermes_kafka
+    command:
+      - redpanda
+      - start
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+    ports:
+      - "19092:19092"
+      - "18082:18082"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+
+  hermes:
+    build: .
+    container_name: hermes_agent
+    environment:
+      - PORT=8080
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=hermes
+      - POSTGRES_PASSWORD=hermes_password
+      - POSTGRES_DB=hermes_db
+      - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
+      # Mock Neo4j to avoid errors if Neo4j container isn't running
+      - NEO4J_URL=neo4j://neo4j:7687 
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  redpanda_data:
