@@ -10,3 +10,9 @@ google-cloud-bigquery==3.18.0
 langgraph==0.0.26
 psycopg2-binary==2.9.9
 confluent-kafka==2.3.0
+crewai==0.22.5
+crewai[tools]==0.22.5
+huggingface-hub==0.21.4
+langchain-huggingface==0.0.2
+google-cloud-aiplatform==1.44.0
+google-cloud-logging==3.9.0
