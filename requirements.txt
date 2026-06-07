@@ -1,0 +1,10 @@
+fastapi==0.110.0
+uvicorn==0.27.1
+pydantic==2.6.3
+langchain-core==0.1.30
+langchain-openai==0.0.8
+langchain-ollama==0.0.1
+langchain-neo4j==0.0.1
+google-cloud-storage==2.15.0
+google-cloud-bigquery==3.18.0
+langgraph==0.0.26

@@ -1,25 +1,33 @@
 # /// script
 # dependencies = [
+#   "fastapi",
+#   "uvicorn",
 #   "langchain-core",
 #   "langchain-openai",
 #   "langchain-ollama",
 #   "langchain-neo4j",
 #   "google-cloud-storage",
+#   "google-cloud-bigquery",
 #   "langgraph",
+#   "pydantic",
 # ]
 # ///
 
 import os
 from typing import TypedDict, Optional
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import uvicorn
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langchain_neo4j import Neo4jGraph
-from google.cloud import storage
+from google.cloud import storage, bigquery
 from langgraph.graph import StateGraph, START, END
 
 # ==========================================
-# MODEL CONFIGURATION (CLOUD VS LOCAL OLLAMA)
+# MODEL CONFIGURATION
 # ==========================================
 USE_LOCAL_LLM = True
 LOCAL_LLM_MODEL = "hermes3"
@@ -32,12 +40,10 @@ else:
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 def call_llm(prompt_text: str, fallback_response: str) -> str:
-    """Helper to invoke LLM with a robust fallback if local/cloud API is offline."""
     try:
         response = llm.invoke(prompt_text)
         return response.content
     except Exception as e:
-        # Fallback response for offline simulation
         return fallback_response
 
 # ==========================================
@@ -56,43 +62,79 @@ except Exception as e:
     db_connected = False
 
 # ==========================================
-# 1. THE GLOBAL STATE (BRAIN MEMORY)
+# 1. THE GLOBAL STATE
 # ==========================================
 class MissionZeroState(TypedDict):
-    question: str                 # The prompt you type
-    intent: Optional[str]         # Master Agent classifies: 'graph_search' or 'chat'
-    cypher_query: Optional[str]   # Worker writes the Neo4j search query
-    graph_context: Optional[str]  # The raw data pulled from your records + GCS
-    final_answer: Optional[str]   # The synthesizer's polished output
+    question: str
+    intent: Optional[str]         # 'graph_search', 'bigquery_search', or 'general_chat'
+    cypher_query: Optional[str]
+    bq_query: Optional[str]
+    graph_context: Optional[str]
+    bq_context: Optional[str]
+    final_answer: Optional[str]
 
 # ==========================================
 # 2. THE MASTER ROUTER NODE
 # ==========================================
 def master_router_node(state: MissionZeroState):
-    """Classifies the prompt to route to the correct worker."""
     print("\n[Node: Master Router] Analyzing query intent...")
-    prompt = f"Does this question require searching our business strategy knowledge graph? Question: {state['question']}"
+    prompt = f"Classify this question into one of three categories: 'GRAPH' (business strategy/knowledge graph), 'BIGQUERY' (tabular data, metrics, counts, data analysis), or 'GENERAL' (everything else). Question: {state['question']}\nRespond with ONLY the category word."
     
     response_content = call_llm(
-        prompt + " Answer only YES or NO.",
-        fallback_response="YES"  # Simulated fallback
-    )
+        prompt,
+        fallback_response="GENERAL"
+    ).strip().upper()
     
-    intent = "graph_search" if "YES" in response_content.upper() else "general_chat"
+    if "GRAPH" in response_content:
+        intent = "graph_search"
+    elif "BIGQUERY" in response_content:
+        intent = "bigquery_search"
+    else:
+        intent = "general_chat"
+        
     print(f"[Node: Master Router] Identified intent: '{intent}'")
     return {"intent": intent}
 
 def route_after_master(state: MissionZeroState):
-    """Conditional logic telling LangGraph where to route after the master router."""
     if state["intent"] == "graph_search":
         return "graph_worker"
+    elif state["intent"] == "bigquery_search":
+        return "bigquery_worker"
     return "gcs_loader"
 
 # ==========================================
-# 3. THE AUTONOMOUS GRAPH WORKER NODE
+# 3. BIGQUERY WORKER NODE
+# ==========================================
+def bigquery_worker_node(state: MissionZeroState):
+    print("\n[Node: BigQuery Worker] Generating and executing BigQuery SQL...")
+    
+    mock_query = "SELECT 'Simulated BigQuery Result' as data"
+    mock_context = "[{'data': 'Simulated BigQuery Result'}]"
+    
+    schema_prompt = f"Write a valid BigQuery Standard SQL query for this question: {state['question']}. If you don't know the exact schema, write a query that discovers dataset/table schemas in the current GCP project. Return ONLY the valid SQL code."
+    
+    bq_query = call_llm(schema_prompt, fallback_response=mock_query).strip()
+    if bq_query.startswith("```"):
+        bq_query = "\n".join([line for line in bq_query.splitlines() if not line.startswith("```")])
+        
+    print(f"[Node: BigQuery Worker] Executing query: {bq_query}")
+    
+    try:
+        client = bigquery.Client()
+        query_job = client.query(bq_query)
+        results = query_job.result()
+        context = str([dict(row) for row in results])
+        print("[Node: BigQuery Worker] Successfully fetched BigQuery results.")
+    except Exception as e:
+        context = f"BigQuery Execution Failed or Not Configured: {e}"
+        print(f"[Node: BigQuery Worker] Warning: query failed ({e}), using fallback dataset.")
+        
+    return {"bq_query": bq_query, "bq_context": context}
+
+# ==========================================
+# 4. THE AUTONOMOUS GRAPH WORKER NODE
 # ==========================================
 def graph_worker_node(state: MissionZeroState):
-    """Autonomously translates the prompt to Cypher, runs it, and saves context."""
     print("\n[Node: Graph Worker] Generating Cypher query based on ontology...")
     
     mock_query = "MATCH (p:Project {name: 'Delta'})-[:EVOLVED_INTO]->(n) RETURN p, n;"
@@ -107,15 +149,12 @@ def graph_worker_node(state: MissionZeroState):
     
     cypher_query = call_llm(query_prompt, fallback_response=mock_query).strip()
     
-    # Strip markdown wrappers if returned by model
     if cypher_query.startswith("```"):
-        lines = cypher_query.splitlines()
-        cypher_query = "\n".join([line for line in lines if not line.startswith("```")])
+        cypher_query = "\n".join([line for line in cypher_query.splitlines() if not line.startswith("```")])
         
     print(f"[Node: Graph Worker] Cypher query: {cypher_query}")
     
     try:
-        print("[Node: Graph Worker] Querying GraphRAG database...")
         raw_results = graph_db.query(cypher_query)
         context = str(raw_results)
     except Exception as e:
@@ -125,64 +164,58 @@ def graph_worker_node(state: MissionZeroState):
     return {"cypher_query": cypher_query, "graph_context": context}
 
 # ==========================================
-# 4. THE GOOGLE CLOUD STORAGE CONTEXT LOADER NODE
+# 5. THE GOOGLE CLOUD STORAGE CONTEXT LOADER
 # ==========================================
 def gcs_loader_node(state: MissionZeroState):
-    """Autonomously fetches operational doctrine context from Google Cloud Storage to ground the synthesis."""
     print("\n[Node: GCS Loader] Downloading operational doctrine from gs://marooncleanup...")
     try:
-        # Initializes GCS storage client using ambient credentials
         client = storage.Client()
         bucket = client.bucket("marooncleanup")
         blob = bucket.blob("OPERATIONAL_DOCTRINE.md")
         if blob.exists():
             doctrine = blob.download_as_text()
-            print("[Node: GCS Loader] Successfully loaded OPERATIONAL_DOCTRINE.md from GCS.")
             gcs_context = f"\n=== GCS Grounding Context (OPERATIONAL_DOCTRINE.md) ===\n{doctrine}"
         else:
             gcs_context = "\n[GCS Loader] Info: OPERATIONAL_DOCTRINE.md not found in bucket."
-            print("[Node: GCS Loader] OPERATIONAL_DOCTRINE.md not found in bucket.")
     except Exception as e:
         gcs_context = f"\n[GCS Loader] Warning: Failed to retrieve GCS context: {e}"
-        print(f"[Node: GCS Loader] Warning: GCS credentials or access failed: {e}")
 
     existing = state.get("graph_context") or ""
     return {"graph_context": existing + gcs_context}
 
 # ==========================================
-# 5. THE SYNTHESIZER NODE (THE WRITER)
+# 6. THE SYNTHESIZER NODE (THE WRITER)
 # ==========================================
 def synthesizer_node(state: MissionZeroState):
-    """Takes raw context or general input and generates a cohesive answer."""
     print("\n[Node: Synthesizer] Writing final response...")
     
+    context_to_use = ""
     if state.get("graph_context"):
-        prompt = f"Use this raw graph and storage data to answer the question: {state['graph_context']}\nQuestion: {state['question']}"
+        context_to_use += f"Graph Data: {state['graph_context']}\n"
+    if state.get("bq_context"):
+        context_to_use += f"BigQuery Data: {state['bq_context']}\n"
+        
+    if context_to_use:
+        prompt = f"Use this data to answer the user's question. If there are errors, explain them.\nData:\n{context_to_use}\nQuestion: {state['question']}"
     else:
         prompt = f"Answer this general business question: {state['question']}"
         
-    fallback_text = (
-        "Project Delta was our legacy sandbox repository for experimental scripts. "
-        "It evolved into 'Mission Zero'—a NASA-grade cleanup orchestrator. This new engine integrates LangGraph, "
-        "LangChain, Google Cloud SDK, and Chroma vector database memory, directly syncing local resources with "
-        "the GCS bucket gs://marooncleanup."
-    )
+    fallback_text = "Mission Zero is a highly capable GCP orchestration agent."
     
     final_answer = call_llm(prompt, fallback_response=fallback_text)
     return {"final_answer": final_answer}
 
 # ==========================================
-# 6. COMPILING THE DIRECTED CYCLIC GRAPH
+# 7. COMPILING THE DIRECTED CYCLIC GRAPH
 # ==========================================
 workflow = StateGraph(MissionZeroState)
 
-# Add nodes
 workflow.add_node("master_router", master_router_node)
 workflow.add_node("graph_worker", graph_worker_node)
+workflow.add_node("bigquery_worker", bigquery_worker_node)
 workflow.add_node("gcs_loader", gcs_loader_node)
 workflow.add_node("synthesizer", synthesizer_node)
 
-# Define edges
 workflow.add_edge(START, "master_router")
 
 workflow.add_conditional_edges(
@@ -190,39 +223,47 @@ workflow.add_conditional_edges(
     route_after_master,
     {
         "graph_worker": "graph_worker",
+        "bigquery_worker": "bigquery_worker",
         "gcs_loader": "gcs_loader"
     }
 )
 
-# Flow graph results into GCS grounding context, then synthesize
 workflow.add_edge("graph_worker", "gcs_loader")
+workflow.add_edge("bigquery_worker", "gcs_loader")
 workflow.add_edge("gcs_loader", "synthesizer")
 workflow.add_edge("synthesizer", END)
 
-# Compile
 mission_zero_app = workflow.compile()
 print("LangGraph State Machine successfully compiled.")
 
 # ==========================================
-# EXECUTION ENTRY POINT
+# 8. FASTAPI CLOUD RUN SERVER
 # ==========================================
-if __name__ == "__main__":
-    user_input = {"question": "What tools did we map out for Project Delta, and did they evolve into anything new?"}
-    print(f"Streaming LangGraph Execution for question: '{user_input['question']}'")
+app = FastAPI(title="Hermes Agent API")
+
+class QueryRequest(BaseModel):
+    question: str
+
+@app.post("/ask")
+async def ask_hermes(request: QueryRequest):
+    user_input = {"question": request.question}
+    print(f"Received question: {user_input['question']}")
     
-    final_state = None
-    for event in mission_zero_app.stream(user_input):
-        for node_name, node_state in event.items():
-            print(f"--- Just finished executing: {node_name} ---")
-            final_state = node_state
-            
-    print("\n====================")
-    print("Final Answer:")
-    print("====================")
-    
-    # Safely fetch result
-    if final_state and "final_answer" in final_state:
-        print(final_state["final_answer"])
-    else:
+    try:
         result = mission_zero_app.invoke(user_input)
-        print(result["final_answer"])
+        return {
+            "question": result.get("question"),
+            "intent": result.get("intent"),
+            "answer": result.get("final_answer")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "agent": "hermes"}
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    print(f"Starting FastAPI server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
