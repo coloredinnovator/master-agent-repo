@@ -129,7 +129,7 @@ def download_folder_recursive(service, folder_id, local_dir):
     return downloaded_files
 
 def upload_to_gcs(local_dir, bucket_name, gcs_prefix="wffoodgroup_drive"):
-    print(f"\nUploading local files from {local_dir} to GCS bucket gs://{bucket_name}/{gcs_prefix}...")
+    print(f"\nUploading local files from {local_dir} to GCS bucket gs://{bucket_name}...")
     try:
         storage_client = storage.Client()
         bucket = storage_client.bucket(bucket_name)
@@ -142,7 +142,13 @@ def upload_to_gcs(local_dir, bucket_name, gcs_prefix="wffoodgroup_drive"):
             local_file_path = Path(root) / file
             # Compute relative path for GCS blob name
             rel_path = local_file_path.relative_to(local_dir)
-            blob_name = f"{gcs_prefix}/{rel_path.as_posix()}"
+            
+            # ROUTING LOGIC: Route user custom sketches/coloring images to ai_studio/sketch_books/
+            # and other regular documents to wffoodgroup_drive/
+            if file.lower().endswith(('.png', '.jpg', '.jpeg')) or "sketch" in file.lower() or "coloring" in file.lower():
+                blob_name = f"ai_studio/sketch_books/{rel_path.as_posix()}"
+            else:
+                blob_name = f"{gcs_prefix}/{rel_path.as_posix()}"
             
             print(f"Uploading {local_file_path} -> gs://{bucket_name}/{blob_name}")
             blob = bucket.blob(blob_name)

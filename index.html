@@ -239,26 +239,90 @@
       term.scrollTop = term.scrollHeight;
     }
 
+    function getQueue() {
+      try {
+        return JSON.parse(localStorage.getItem('maroon_cleanup_queue') || '[]');
+      } catch(e) {
+        return [];
+      }
+    }
+
+    function clearQueue() {
+      localStorage.removeItem('maroon_cleanup_queue');
+    }
+
     function triggerDryRun() {
+      const queue = getQueue();
       addLog("Initializing Dry Run folder scan...", "cyan");
-      setTimeout(() => addLog("Found folder ID: 1uv1UuMOdsNVqZk0BdjUsoeK-UY_UizJe", "green"), 800);
-      setTimeout(() => addLog("File: cairo_barge_dispatch.pdf (ID: 99a2c3)", "green"), 1500);
-      setTimeout(() => addLog("File: gary_rail_telemetry.gsheet (ID: 88b2c4)", "green"), 2200);
-      setTimeout(() => addLog("Dry run scan completed. 2 files staged for clean-up.", "pink"), 3000);
+      
+      let baseDelay = 800;
+      setTimeout(() => addLog("Found folder ID: 1uv1UuMOdsNVqZk0BdjUsoeK-UY_UizJe", "green"), baseDelay);
+      
+      baseDelay += 700;
+      setTimeout(() => addLog("File: cairo_barge_dispatch.pdf (ID: 99a2c3)", "green"), baseDelay);
+      
+      baseDelay += 700;
+      setTimeout(() => addLog("File: gary_rail_telemetry.gsheet (ID: 88b2c4)", "green"), baseDelay);
+      
+      if (queue.length > 0) {
+        queue.forEach((item, i) => {
+          baseDelay += 700;
+          setTimeout(() => addLog(`File: ${item.filename} (ID: ${item.id})`, "green"), baseDelay);
+        });
+      }
+      
+      baseDelay += 800;
+      const fileCount = 2 + queue.length;
+      setTimeout(() => addLog(`Dry run scan completed. ${fileCount} files staged for clean-up.`, "pink"), baseDelay);
     }
 
     function triggerMigration() {
+      const queue = getQueue();
       addLog("Starting full GCS migration & clean-up loop...", "pink");
-      setTimeout(() => addLog("Downloading cairo_barge_dispatch.pdf from Drive...", "cyan"), 1000);
-      setTimeout(() => addLog("Uploading cairo_barge_dispatch.pdf -> gs://marooncleanup/wffoodgroup_drive/", "green"), 2500);
-      setTimeout(() => addLog("Verifying integrity checksum... Match", "green"), 3500);
-      setTimeout(() => addLog("Deleting remote file cairo_barge_dispatch.pdf (ID: 99a2c3) from Drive to clean workspace.", "pink"), 4500);
       
-      setTimeout(() => addLog("Downloading gary_rail_telemetry.gsheet from Drive...", "cyan"), 5500);
-      setTimeout(() => addLog("Converting Spreadsheet to CSV... Completed.", "cyan"), 6500);
-      setTimeout(() => addLog("Uploading gary_rail_telemetry.csv -> gs://marooncleanup/wffoodgroup_drive/", "green"), 8500);
-      setTimeout(() => addLog("Deleting remote file gary_rail_telemetry.gsheet (ID: 88b2c4) from Drive.", "pink"), 9500);
-      setTimeout(() => addLog("Migration complete. Workspace clean-up executed successfully.", "green"), 11000);
+      let baseDelay = 1000;
+      setTimeout(() => addLog("Downloading cairo_barge_dispatch.pdf from Drive...", "cyan"), baseDelay);
+      baseDelay += 1500;
+      setTimeout(() => addLog("Uploading cairo_barge_dispatch.pdf -> gs://marooncleanup/wffoodgroup_drive/", "green"), baseDelay);
+      baseDelay += 1000;
+      setTimeout(() => addLog("Verifying integrity checksum... Match", "green"), baseDelay);
+      baseDelay += 1000;
+      setTimeout(() => addLog("Deleting remote file cairo_barge_dispatch.pdf (ID: 99a2c3) from Drive to clean workspace.", "pink"), baseDelay);
+      
+      baseDelay += 1000;
+      setTimeout(() => addLog("Downloading gary_rail_telemetry.gsheet from Drive...", "cyan"), baseDelay);
+      baseDelay += 1000;
+      setTimeout(() => addLog("Converting Spreadsheet to CSV... Completed.", "cyan"), baseDelay);
+      baseDelay += 2000;
+      setTimeout(() => addLog("Uploading gary_rail_telemetry.csv -> gs://marooncleanup/wffoodgroup_drive/", "green"), baseDelay);
+      baseDelay += 1000;
+      setTimeout(() => addLog("Deleting remote file gary_rail_telemetry.gsheet (ID: 88b2c4) from Drive.", "pink"), baseDelay);
+      
+      if (queue.length > 0) {
+        queue.forEach((item) => {
+          baseDelay += 1000;
+          setTimeout(() => addLog(`Downloading ${item.filename} from Drive...`, "cyan"), baseDelay);
+          
+          baseDelay += 1500;
+          setTimeout(() => addLog(`Uploading ${item.filename} -> gs://marooncleanup/ai_studio/sketch_books/`, "green"), baseDelay);
+          
+          baseDelay += 1000;
+          setTimeout(() => addLog(`Verifying integrity checksum for ${item.filename}... Match`, "green"), baseDelay);
+          
+          baseDelay += 1000;
+          setTimeout(() => {
+            addLog(`Deleting remote file ${item.filename} (ID: ${item.id}) from Drive.`, "pink");
+            const ruleName = `Auto-Contrast Sketch Filter for ${item.title}`;
+            pushKernelRuleWithName(ruleName);
+          }, baseDelay);
+        });
+      }
+      
+      baseDelay += 1500;
+      setTimeout(() => {
+        addLog("Migration complete. Workspace clean-up executed successfully.", "green");
+        clearQueue();
+      }, baseDelay);
     }
 
     let ruleCount = 3;
@@ -266,6 +330,10 @@
       const name = prompt("Enter new Kernel Rule description:");
       if (!name) return;
 
+      pushKernelRuleWithName(name);
+    }
+
+    function pushKernelRuleWithName(name) {
       const list = document.getElementById('rules-list');
       const item = document.createElement('div');
       item.className = 'rule-item';

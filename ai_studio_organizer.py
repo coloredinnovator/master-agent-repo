@@ -36,25 +36,44 @@ def organize_ai_studio_data():
         return
         
     for blob in blobs:
-        if not blob.name.endswith(".txt") and not blob.name.endswith(".json"):
+        is_sketch = blob.name.lower().endswith((".png", ".jpg", ".jpeg"))
+        
+        if not is_sketch and not blob.name.endswith(".txt") and not blob.name.endswith(".json"):
             continue
             
         print(f"Analyzing file: {blob.name}")
-        content = blob.download_as_text()
         
-        if not content.strip() or content.strip() == "{}":
-            print(f"  Skipping {blob.name} (File is empty).")
-            continue
+        if is_sketch:
+            content_desc = f"Kids custom coloring sketch book file named: {os.path.basename(blob.name)}"
+        else:
+            content_desc = blob.download_as_text()
+            if not content_desc.strip() or content_desc.strip() == "{}":
+                print(f"  Skipping {blob.name} (File is empty).")
+                continue
             
-        # Prompt LLM to categorize the file based on contents
-        prompt = f"""
-        Read the following conversation or prompts from Google AI Studio:
-        ---
-        {content[:4000]} # Limit to 4k chars for categorization
-        ---
-        What is the primary topic of this conversation?
-        Respond with ONLY ONE word or short phrase suitable for a folder name (e.g., 'Coding', 'Marketing_Strategy', 'Personal').
-        """
+        # Prompt LLM to categorize the file or sketch based on contents
+        if is_sketch:
+            prompt = f"""
+            Analyze this custom kid's sketch book coloring sheet name:
+            ---
+            {os.path.basename(blob.name)}
+            ---
+            Based on the keywords in the filename (e.g. 'train', 'van', 'farm', 'medical', 'freight'), classify this sketch into exactly one category folder name:
+            - 'Freight_Logistics'
+            - 'Medical_Telehealth'
+            - 'AgriTech_Farming'
+            - 'Uncategorized_Sketches'
+            Respond with ONLY the exact folder name.
+            """
+        else:
+            prompt = f"""
+            Read the following conversation or prompts from Google AI Studio:
+            ---
+            {content_desc[:4000]} # Limit to 4k chars for categorization
+            ---
+            What is the primary topic of this conversation?
+            Respond with ONLY ONE word or short phrase suitable for a folder name (e.g., 'Coding', 'Marketing_Strategy', 'Personal').
+            """
         
         try:
             category = llm.invoke(prompt).content.strip().replace(" ", "_").replace("/", "-")
