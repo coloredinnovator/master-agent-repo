@@ -19,7 +19,6 @@ services:
       retries: 5
 
   redpanda:
-    # Redpanda is a Kafka-compatible streaming platform that is much lighter and easier to run
     image: docker.redpanda.com/redpandadata/redpanda:v23.2.2
     container_name: hermes_kafka
     command:
@@ -32,29 +31,68 @@ services:
       - --node-id 0
       - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
       - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
-      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
-      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
     ports:
       - "19092:19092"
-      - "18082:18082"
     volumes:
       - redpanda_data:/var/lib/redpanda/data
+
+  # --- NEW 30-REPO INFRASTRUCTURE ---
+
+  chromadb:
+    image: chromadb/chroma:0.4.24
+    container_name: hermes_chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+
+  redis:
+    image: redis:7-alpine
+    container_name: hermes_redis
+    ports:
+      - "6379:6379"
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: hermes_searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - searxng_data:/etc/searxng
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: hermes_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: hermes_grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  # --- MASTER ORCHESTRATOR ---
 
   hermes:
     build: .
     container_name: hermes_agent
     environment:
-      - PORT=8080
+      - PORT=8081 # Changed to 8081 to avoid conflict with SearxNG
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=hermes
       - POSTGRES_PASSWORD=hermes_password
       - POSTGRES_DB=hermes_db
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
-      # Mock Neo4j to avoid errors if Neo4j container isn't running
-      - NEO4J_URL=neo4j://neo4j:7687 
+      - CHROMADB_HOST=chromadb
+      - REDIS_HOST=redis
     ports:
-      - "8080:8080"
+      - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,3 +102,7 @@ services:
 volumes:
   postgres_data:
   redpanda_data:
+  chromadb_data:
+  searxng_data:
+  prometheus_data:
+  grafana_data:
